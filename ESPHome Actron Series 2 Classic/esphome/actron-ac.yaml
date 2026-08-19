@@ -1,0 +1,161 @@
+substitutions:
+  device_name: "actron-classic-interface"
+  friendly_name: "Actron AC Interface"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "Home Assistant <-> Actron Series 2 Classic RS485 interface"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# The custom protocol component. `components/` is a sibling directory of
+# this YAML file -- keep them together when you copy this project onto the
+# ESPHome dashboard's config folder.
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [actron_classic]
+
+logger:
+  level: DEBUG
+  logs:
+    wifi: INFO
+    api: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${friendly_name} Setup"
+    password: !secret fallback_hotspot_password
+
+captive_portal:
+
+# --- RS485 bus ---
+# Baud 9600, 8 data bits, 1 stop bit, no parity, per design document.
+uart:
+  id: ac_uart
+  tx_pin: GPIO26
+  rx_pin: GPIO27
+  baud_rate: 9600
+  data_bits: 8
+  parity: NONE
+  stop_bits: 1
+
+# The MAX485 DE and RE pins are tied together and driven from one GPIO:
+# LOW = receive, HIGH = transmit.
+actron_classic:
+  id: actron_hub
+  uart_id: ac_uart
+  de_re_pin: GPIO25
+
+# --- Home Assistant entities ---
+
+climate:
+  - platform: actron_classic
+    actron_classic_id: actron_hub
+    name: "Air Conditioner"
+
+select:
+  - platform: actron_classic
+    actron_classic_id: actron_hub
+    fan_mode:
+      name: "AC Fan Mode"
+      icon: "mdi:fan"
+    fan_speed:
+      name: "AC Fan Speed"
+      icon: "mdi:fan-speed-1"
+
+switch:
+  - platform: actron_classic
+    actron_classic_id: actron_hub
+    zone1:
+      name: "AC Zone 1"
+    zone2:
+      name: "AC Zone 2"
+    diagnostics_enabled:
+      name: "AC Diagnostic Entities Enabled"
+      icon: "mdi:bug-outline"
+      # Default on, and stays on across reboots, matching the previous
+      # always-publish behaviour unless the user explicitly turns it off.
+      restore_mode: RESTORE_DEFAULT_ON
+
+binary_sensor:
+  - platform: actron_classic
+    actron_classic_id: actron_hub
+    reversing_valve:
+      name: "AC Reversing Valve (Reverse Cycle)"
+    compressor_contactor:
+      name: "AC Compressor Contactor"
+    run_request:
+      name: "AC Run Request"
+    system_power:
+      name: "AC System Power"
+    system_running:
+      name: "AC System Running"
+    zone1_status:
+      name: "AC Zone 1 Status"
+    zone2_status:
+      name: "AC Zone 2 Status"
+    bus_data_stale:
+      name: "AC Bus Data Stale"
+  - platform: status
+    name: "AC Interface Online"
+    entity_category: diagnostic
+
+sensor:
+  - platform: actron_classic
+    actron_classic_id: actron_hub
+    indoor_coil_temperature:
+      name: "AC Indoor Coil Temperature"
+    outdoor_coil_temperature:
+      name: "AC Outdoor Coil Temperature"
+    compressor_speed:
+      name: "AC Compressor Speed"
+    indoor_fan_rpm:
+      name: "AC Indoor Fan Speed"
+    checksum_failures:
+      name: "AC Bus Checksum Failures"
+    poll_responses:
+      name: "AC Poll Responses Sent"
+    last_response_latency:
+      name: "AC Poll Response Latency"
+    action_queue_depth:
+      name: "AC Action Queue Depth"
+    action_retries:
+      name: "AC Action Retries"
+    seconds_since_last_pl1:
+      name: "AC Seconds Since Last Valid PL1"
+    validation_failures:
+      name: "AC Payload Validation Failures"
+  - platform: wifi_signal
+    name: "AC Interface WiFi Signal"
+    update_interval: 60s
+    entity_category: diagnostic
+  - platform: uptime
+    name: "AC Interface Uptime"
+    entity_category: diagnostic
+
+text_sensor:
+  - platform: actron_classic
+    actron_classic_id: actron_hub
+    system_clock:
+      name: "AC System Clock"
+    validation_detail:
+      name: "AC Payload Validation Detail"
+  - platform: version
+    name: "AC Interface ESPHome Version"
+    entity_category: diagnostic
